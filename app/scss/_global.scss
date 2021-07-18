@@ -1,6 +1,7 @@
 // Global
 
 a{
+    display: inline-block;
     text-decoration: none;
     color: inherit;
 }
@@ -8,11 +9,13 @@ a{
 ul,
 ol{
     list-style: none;
+    padding: none;
 }
 
 input,
 button,
 textarea{
+    background: none;
     border: none;
     font-family: inherit;
 }
