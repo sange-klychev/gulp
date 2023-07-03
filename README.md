@@ -1,4 +1,4 @@
-# xvdk-promo
+# how start
 
 node version **16.15.0**
 - npm i --global gulp-cli  // install the gulp 
