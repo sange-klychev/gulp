@@ -1,98 +1,50 @@
-const { src, dest, watch, parallel, series } = require('gulp');
+import gulp from 'gulp';
 
-const scss         = require('gulp-sass');
-const concat       = require('gulp-concat');
-const browserSync  = require('browser-sync').create();
-const uglify       = require('gulp-uglify-es').default;
-const autoprefixer = require('gulp-autoprefixer');
-const imagemin     = require('gulp-imagemin');
-const del          = require('del');
+import {path} from './gulp/configs/path.js';
+import {plugins} from './gulp/configs/plugins.js';
 
-function images() {
-    return src('app/img/**/*')
-    .pipe(imagemin([
-        imagemin.gifsicle({ interlaced: true }),
-        imagemin.mozjpeg({ quality: 75, progressive: true }),
-        imagemin.optipng({ optimizationLevel: 5 }),
-        imagemin.svgo({
-            plugins: [
-                { removeViewBox: true },
-                { cleanupIDs: false }
-            ]
-        })
-    ]))
-    .pipe(dest('dist/img'));
-}
-function cleanDist() {
-    return del('dist');
-}
-function browsersync() {
-    browserSync.init({
-        server: {
-            baseDir: 'app/'
-        }
-    });
-}
-function scripts() {
-    return src([
-        'app/js/main.js'
-    ])
-    .pipe(concat('main.min.js'))
-    .pipe(uglify())
-    .pipe(dest('app/js'))
-    .pipe(browserSync.stream());
-}
-function libsScripts() {
-    return src([
-            'node_modules/jquery/dist/jquery.js'
-        ])
-    .pipe(concat('libs.min.js'))
-    .pipe(uglify())
-    .pipe(dest('app/js'))
-    .pipe(browserSync.stream());
-}
-function styles () {
-    return src('app/scss/style.scss')
-    .pipe(scss({outputStyle: 'compressed'}))
-    .pipe(concat('style.min.css'))
-    .pipe(autoprefixer({
-        overrideBrowserslist: ['last 10 version'],
-        grid: true
-    }))
-    .pipe(dest('app/css'))
-    .pipe(browserSync.stream());
-}
-function libsStyles() {
-    return src(['node_modules/normalize.css/normalize.css'])
-    .pipe(scss({
-        outputStyle: 'compressed'
-    }))
-    .pipe(concat('libs.min.css'))
-    .pipe(dest('app/css'));
-}
-function build () {
-    return src([
-        'app/css/**/*.css',
-        'app/fonts/**/*',
-        'app/js/**/*.js',
-        'app/*.html'
-    ], {base: 'app'})
-    .pipe(dest('dist'));
-}
-function watching () {
-    watch(['app/scss/**/*.scss'], styles);
-    watch(['app/js/**/*.js', '!app/js/main.min.js'], scripts);
-    watch(['app/*.html']).on('change', browserSync.reload);
+global.app = {
+    isBuild: process.argv.includes('--build'),
+    isDev: !process.argv.includes('--build'),
+    gulp,
+    path,
+    plugins
 }
 
-exports.styles = styles;
-exports.libsStyles = libsStyles;
-exports.watching = watching;
-exports.browsersync = browsersync;
-exports.scripts = scripts;
-exports.libsScripts = libsScripts;
-exports.images = images;
-exports.cleanDist = cleanDist;
+import {copy} from './gulp/tasks/copy.js';
+import {reset} from './gulp/tasks/reset.js';
+import {html} from './gulp/tasks/html.js';
+import {server} from './gulp/tasks/server.js';
+import {scss} from './gulp/tasks/scss.js';
+import {js, apiConfig} from './gulp/tasks/js.js';
+import {images} from './gulp/tasks/images.js';
+import {svgSprite} from './gulp/tasks/svgSprite.js';
+import {zip} from './gulp/tasks/zip.js';
+import {ftp} from './gulp/tasks/ftp.js';
+import {fontsStyle, otfToTtf, ttfToWoff} from './gulp/tasks/fonts.js';
 
-exports.build = series(cleanDist, images, build);
-exports.default = parallel(libsStyles, styles, libsScripts, scripts, browsersync, watching);
+// Наблюдатель за изменениями в файлах
+function watcher() {
+    gulp.watch(path.watch.files, copy);
+    gulp.watch(path.watch.html, html);
+    gulp.watch(path.watch.scss, scss);
+    gulp.watch(path.watch.js, js);
+    gulp.watch(path.watch.images, images);
+}
+
+// Последовательная обработка шрифтов
+const fonts = gulp.series(otfToTtf, ttfToWoff, fontsStyle);
+
+// Основные задачи
+const mainTasks = gulp.series(fonts, gulp.parallel(copy, html, scss, apiConfig, js, images, svgSprite));
+
+// Построение сценариев выполнения задач
+export const dev = gulp.series(reset, mainTasks, gulp.parallel(watcher, server));
+export const build = gulp.series(reset, mainTasks);
+export const deployZIP = gulp.series(reset, mainTasks, zip);
+export const deployFTP = gulp.series(reset, mainTasks, ftp);
+
+// Выполнение сценария по умолчанию
+gulp.task('default', dev);
+
+export {svgSprite};
